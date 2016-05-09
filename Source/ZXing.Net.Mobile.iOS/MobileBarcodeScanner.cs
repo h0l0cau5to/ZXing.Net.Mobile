@@ -230,6 +230,8 @@ namespace ZXing.Mobile
 			}
 		}
 		public UIView CustomOverlay { get;set; }
+
+        public UIInterfaceOrientationMask Orientation;
 	}
 }
 

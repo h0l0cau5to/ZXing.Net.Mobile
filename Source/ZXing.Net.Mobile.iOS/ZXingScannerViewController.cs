@@ -1,219 +1,173 @@
 using System;
-using System.Text;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-
-#if __UNIFIED__
 using UIKit;
-using Foundation;
-using AVFoundation;
 using CoreGraphics;
-#else
-using MonoTouch.UIKit;
-using MonoTouch.Foundation;
-using MonoTouch.AVFoundation;
-using MonoTouch.CoreGraphics;
-using System.Drawing;
-
-using CGSize = System.Drawing.SizeF;
-using CGRect = System.Drawing.RectangleF;
-#endif
-
-using ZXing;
 
 namespace ZXing.Mobile
-{	
-    public class ZXingScannerViewController : UIViewController, IScannerViewController
-	{
-		ZXingScannerView scannerView;
+{
+    public sealed class ZXingScannerViewController : UIViewController, IScannerViewController
+    {
+        private ZXingScannerView _scannerView;
 
-		public event Action<ZXing.Result> OnScannedResult;
+        public event Action<Result> OnScannedResult;
 
-		public MobileBarcodeScanningOptions ScanningOptions { get;set; }
-		public MobileBarcodeScanner Scanner { get;set; }
-        public bool ContinuousScanning { get;set; }
+        public MobileBarcodeScanningOptions ScanningOptions { get; set; }
+        public MobileBarcodeScanner Scanner { get; set; }
+        public bool ContinuousScanning { get; set; }
 
-		UIActivityIndicatorView loadingView;
-		UIView loadingBg;
+        private UIActivityIndicatorView _loadingView;
+        private UIView _loadingBg;
 
-		public UIView CustomLoadingView { get; set; }
+        public UIView CustomLoadingView { get; set; }
 
-		public ZXingScannerViewController(MobileBarcodeScanningOptions options, MobileBarcodeScanner scanner)
-		{
-			this.ScanningOptions = options;
-			this.Scanner = scanner;
+        public ZXingScannerViewController(MobileBarcodeScanningOptions options, MobileBarcodeScanner scanner)
+        {
+            ScanningOptions = options;
+            Scanner = scanner;
 
-			var appFrame = UIScreen.MainScreen.ApplicationFrame;
+            var appFrame = UIScreen.MainScreen.ApplicationFrame;
 
-			this.View.Frame = new CGRect(0, 0, appFrame.Width, appFrame.Height);
-			this.View.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
-		}
+            View.Frame = new CGRect(0, 0, appFrame.Width, appFrame.Height);
+            View.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
+        }
 
-		public UIViewController AsViewController()
-		{
-			return this;
-		}
+        public UIViewController AsViewController()
+        {
+            return this;
+        }
 
-		public void Cancel()
-		{            
-			this.InvokeOnMainThread (scannerView.StopScanning);
-		}
+        public void Cancel()
+        {
+            InvokeOnMainThread(_scannerView.StopScanning);
+        }
 
-		UIStatusBarStyle originalStatusBarStyle = UIStatusBarStyle.Default;
+        private UIStatusBarStyle _originalStatusBarStyle = UIStatusBarStyle.Default;
 
-		public override void ViewDidLoad ()
-		{
-			loadingBg = new UIView (this.View.Frame) { BackgroundColor = UIColor.Black, AutoresizingMask = UIViewAutoresizing.FlexibleDimensions };
-			loadingView = new UIActivityIndicatorView (UIActivityIndicatorViewStyle.WhiteLarge)
-			{
-				AutoresizingMask = UIViewAutoresizing.FlexibleMargins
-			};
-			loadingView.Frame = new CGRect ((this.View.Frame.Width - loadingView.Frame.Width) / 2, 
-				(this.View.Frame.Height - loadingView.Frame.Height) / 2,
-				loadingView.Frame.Width, 
-				loadingView.Frame.Height);			
+        public override void ViewDidLoad()
+        {
+            _loadingBg = new UIView(View.Frame) { BackgroundColor = UIColor.Black, AutoresizingMask = UIViewAutoresizing.FlexibleDimensions };
+            _loadingView = new UIActivityIndicatorView(UIActivityIndicatorViewStyle.WhiteLarge) { AutoresizingMask = UIViewAutoresizing.FlexibleMargins };
+            _loadingView.Frame = new CGRect((View.Frame.Width - _loadingView.Frame.Width) / 2,
+                                            (View.Frame.Height - _loadingView.Frame.Height) / 2,
+                                            _loadingView.Frame.Width,
+                                            _loadingView.Frame.Height);
 
-			loadingBg.AddSubview (loadingView);
-			View.AddSubview (loadingBg);
-			loadingView.StartAnimating ();
+            _loadingBg.AddSubview(_loadingView);
+            View.AddSubview(_loadingBg);
+            _loadingView.StartAnimating();
 
-			scannerView = new ZXingScannerView(new CGRect(0, 0, View.Frame.Width, View.Frame.Height));
-			scannerView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
-			scannerView.UseCustomOverlayView = this.Scanner.UseCustomOverlay;
-			scannerView.CustomOverlayView = this.Scanner.CustomOverlay;
-			scannerView.TopText = this.Scanner.TopText;
-			scannerView.BottomText = this.Scanner.BottomText;
-			scannerView.CancelButtonText = this.Scanner.CancelButtonText;
-			scannerView.FlashButtonText = this.Scanner.FlashButtonText;
-            scannerView.OnCancelButtonPressed += delegate {                
-                Scanner.Cancel ();
+            _scannerView = new ZXingScannerView(new CGRect(0, 0, View.Frame.Width, View.Frame.Height))
+            {
+                AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight,
+                UseCustomOverlayView = Scanner.UseCustomOverlay,
+                CustomOverlayView = Scanner.CustomOverlay,
+                TopText = Scanner.TopText,
+                BottomText = Scanner.BottomText,
+                CancelButtonText = Scanner.CancelButtonText,
+                FlashButtonText = Scanner.FlashButtonText
             };
+            _scannerView.OnCancelButtonPressed += () => Scanner.Cancel();
 
-			//this.View.AddSubview(scannerView);
-			this.View.InsertSubviewBelow (scannerView, loadingView);
-
-			this.View.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
-		}
-
-		public void Torch(bool on)
-		{
-			if (scannerView != null)
-				scannerView.Torch (on);
-		}
-
-		public void ToggleTorch()
-		{
-			if (scannerView != null)
-				scannerView.ToggleTorch ();
-		}
-
-        public void PauseAnalysis ()
-        {
-            scannerView.PauseAnalysis ();
+            View.InsertSubviewBelow(_scannerView, _loadingView);
+            View.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
         }
 
-        public void ResumeAnalysis ()
+        public void Torch(bool on)
         {
-            scannerView.ResumeAnalysis ();
+            _scannerView?.Torch(on);
         }
 
-		public bool IsTorchOn
-		{
-			get { return scannerView.IsTorchOn; }
-		}
+        public void ToggleTorch()
+        {
+            _scannerView?.ToggleTorch();
+        }
 
-		public override void ViewDidAppear (bool animated)
-		{
-			scannerView.OnScannerSetupComplete += HandleOnScannerSetupComplete;
+        public void PauseAnalysis()
+        {
+            _scannerView.PauseAnalysis();
+        }
 
-			originalStatusBarStyle = UIApplication.SharedApplication.StatusBarStyle;
+        public void ResumeAnalysis()
+        {
+            _scannerView.ResumeAnalysis();
+        }
 
-			if (UIDevice.CurrentDevice.CheckSystemVersion (7, 0))
-			{
-				UIApplication.SharedApplication.StatusBarStyle = UIStatusBarStyle.Default;
-				SetNeedsStatusBarAppearanceUpdate ();
-			}
+        public bool IsTorchOn => _scannerView.IsTorchOn;
+
+        public override void ViewDidAppear(bool animated)
+        {
+            _scannerView.OnScannerSetupComplete += HandleOnScannerSetupComplete;
+
+            _originalStatusBarStyle = UIApplication.SharedApplication.StatusBarStyle;
+
+            if (UIDevice.CurrentDevice.CheckSystemVersion(7, 0))
+            {
+                UIApplication.SharedApplication.StatusBarStyle = UIStatusBarStyle.Default;
+                SetNeedsStatusBarAppearanceUpdate();
+            }
             else
                 UIApplication.SharedApplication.SetStatusBarStyle(UIStatusBarStyle.BlackTranslucent, false);
 
-			Console.WriteLine("Starting to scan...");
+            Console.WriteLine("Starting to scan...");
 
-			Task.Factory.StartNew (() =>
-			{
-				BeginInvokeOnMainThread(() => scannerView.StartScanning (result => {
-
-                    if (!ContinuousScanning) {
-                        Console.WriteLine ("Stopping scan...");
-                        scannerView.StopScanning ();
+            Task.Factory.StartNew(() =>
+            {
+                BeginInvokeOnMainThread(() => _scannerView.StartScanning(result =>
+                {
+                    if (!ContinuousScanning)
+                    {
+                        Console.WriteLine("Stopping scan...");
+                        _scannerView.StopScanning();
                     }
-					
-					var evt = this.OnScannedResult;
-					if (evt != null)
-						evt (result);
-                        
-                },this.ScanningOptions));
-			});
-		}
 
-		public override void ViewDidDisappear (bool animated)
-		{
-			if (scannerView != null)
-				scannerView.StopScanning();
+                    var evt = OnScannedResult;
+                    evt?.Invoke(result);
+                }, ScanningOptions));
+            });
+        }
 
-			scannerView.OnScannerSetupComplete -= HandleOnScannerSetupComplete;
-		}
+        public override void ViewDidDisappear(bool animated)
+        {
+            _scannerView?.StopScanning();
+            _scannerView.OnScannerSetupComplete -= HandleOnScannerSetupComplete;
+        }
 
-		public override void ViewWillDisappear(bool animated)
-		{
-			UIApplication.SharedApplication.SetStatusBarStyle(originalStatusBarStyle, false);
-		}
+        public override void ViewWillDisappear(bool animated)
+        {
+            UIApplication.SharedApplication.SetStatusBarStyle(_originalStatusBarStyle, false);
+        }
 
-		public override void DidRotate (UIInterfaceOrientation fromInterfaceOrientation)
-		{
-			if (scannerView != null)
-				scannerView.DidRotate (this.InterfaceOrientation);
+        public override void DidRotate(UIInterfaceOrientation fromInterfaceOrientation)
+        {
+            _scannerView?.DidRotate(InterfaceOrientation);
+        }
 
-			//overlayView.LayoutSubviews();
-		}	
-		public override bool ShouldAutorotate ()
-		{
-			return true;
-		}
+        public override bool ShouldAutorotate() => true;
 
-		public override UIInterfaceOrientationMask GetSupportedInterfaceOrientations ()
-		{
-			return UIInterfaceOrientationMask.All;
-		}
+        public override UIInterfaceOrientationMask GetSupportedInterfaceOrientations() => Scanner.Orientation;
 
-		[Obsolete ("Deprecated in iOS6. Replace it with both GetSupportedInterfaceOrientations and PreferredInterfaceOrientationForPresentation")]
-		public override bool ShouldAutorotateToInterfaceOrientation (UIInterfaceOrientation toInterfaceOrientation)
-		{
-			return true;
-		}
+        private void HandleOnScannerSetupComplete()
+        {
+            BeginInvokeOnMainThread(() =>
+            {
+                if (_loadingView != null && _loadingBg != null && _loadingView.IsAnimating)
+                {
+                    _loadingView.StopAnimating();
 
-		void HandleOnScannerSetupComplete ()
-		{
-			BeginInvokeOnMainThread (() =>
-			{
-				if (loadingView != null && loadingBg != null && loadingView.IsAnimating)
-				{
-					loadingView.StopAnimating ();
+                    UIView.BeginAnimations("zoomout");
 
-					UIView.BeginAnimations("zoomout");
+                    UIView.SetAnimationDuration(2.0f);
+                    UIView.SetAnimationCurve(UIViewAnimationCurve.EaseOut);
 
-					UIView.SetAnimationDuration(2.0f);
-					UIView.SetAnimationCurve(UIViewAnimationCurve.EaseOut);
+                    _loadingBg.Transform = CGAffineTransform.MakeScale(2.0f, 2.0f);
+                    _loadingBg.Alpha = 0.0f;
 
-					loadingBg.Transform = CGAffineTransform.MakeScale(2.0f, 2.0f);
-					loadingBg.Alpha = 0.0f;
+                    UIView.CommitAnimations();
 
-					UIView.CommitAnimations();
-
-
-					loadingBg.RemoveFromSuperview();
-				}
-			});
-		}
-	}
+                    _loadingBg.RemoveFromSuperview();
+                }
+            });
+        }
+    }
 }
 
